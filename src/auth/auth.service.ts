@@ -100,7 +100,7 @@ export class AuthService {
 		})
 
 		const accessToken = await this.jwtService.signAsync(data, {
-			expiresIn: '1h',
+			expiresIn: '15min',
 		})
 		return { refreshToken, accessToken }
 	}
