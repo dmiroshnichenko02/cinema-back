@@ -2,13 +2,15 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { ModelType } from '@typegoose/typegoose/lib/types'
 import { Types } from 'mongoose'
 import { InjectModel } from 'nestjs-typegoose'
+import { TelegramService } from 'src/telegram/telegram.service'
 import { CreateMovieDto } from './create-movie.dto'
 import { MovieModel } from './movie.model'
 
 @Injectable()
 export class MovieService {
 	constructor(
-		@InjectModel(MovieModel) private readonly MovieModel: ModelType<MovieModel>
+		@InjectModel(MovieModel) private readonly MovieModel: ModelType<MovieModel>,
+		private readonly telegramService: TelegramService
 	) {}
 
 	async getAll(searchTerms?: string) {
@@ -76,6 +78,18 @@ export class MovieService {
 			.exec()
 	}
 
+	async updateRating(movieId: Types.ObjectId, newRating: number) {
+		return this.MovieModel.findByIdAndUpdate(
+			movieId,
+			{
+				rating: newRating,
+			},
+			{
+				new: true,
+			}
+		).exec()
+	}
+
 	// Admin
 
 	async byId(_id: string) {
@@ -101,7 +115,10 @@ export class MovieService {
 	}
 
 	async update(_id: string, dto: CreateMovieDto) {
-		//Telegram
+		if (!dto.isSendTelegram) {
+			await this.sendNotification(dto)
+			dto.isSendTelegram = true
+		}
 
 		const updateMovie = await this.MovieModel.findByIdAndUpdate(_id, dto, {
 			new: true,
@@ -118,5 +135,27 @@ export class MovieService {
 		if (!deleteMovie) throw new NotFoundException('Movie not found')
 
 		return deleteMovie
+	}
+
+	async sendNotification(dto: CreateMovieDto) {
+		// if(process.env.NODE_ENV !== 'development')
+		// 	await this.telegramService.sendPhoto(dto.poster)
+
+		await this.telegramService.sendPhoto(
+			'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSz41x6n-Pbfdnh31bhKSgT3CLFl5jF9GNOWla1rGjQIQ&s'
+		)
+		const message = `<b>${dto.title}</b>`
+		await this.telegramService.sendMessage(message, {
+			reply_markup: {
+				inline_keyboard: [
+					[
+						{
+							url: 'https://okko.tv/movie/free-guy',
+							text: '🍿 Go to watch',
+						},
+					],
+				],
+			},
+		})
 	}
 }
